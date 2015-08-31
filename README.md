@@ -9,7 +9,10 @@ csvde -f test.csv
 ```
 
 Converts it to alias file format.
-
+```
+# 'testlist' 
+testlist:testguy@stewie.example.com,tester@example.com,testgal@stewie.example.com
+```
 
 In theory, If you have all the email accounts set up on your linux server(or an external service with a different domain), this should transition email groups from exchange/AD to the aliases file for your linux server.
 
