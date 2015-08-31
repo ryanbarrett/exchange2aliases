@@ -17,7 +17,7 @@ testlist:testguy@stewie.example.com,tester@example.com,testgal@stewie.example.co
 In theory, If you have all the email accounts set up on your linux server(or an external service with a different domain), this should transition email groups from exchange/AD to the aliases file for your linux server.
 
 ```
-usage: ad2aliases.py [-h] --csvfile CSVFILE [--outfile OUTFILE]
+usage: exchange2aliases.py [-h] --csvfile CSVFILE [--outfile OUTFILE]
 
 Arguments that may be parsed.
 
