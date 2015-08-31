@@ -10,6 +10,9 @@ class adobject:
   def name(self,name):
     self.name = name
 
+  def objectClass(self,objectClass):
+    self.objectClass = objectClass
+
   def mail(self,mail):
     self.mail = mail
   
