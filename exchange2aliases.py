@@ -38,7 +38,7 @@ def BuildADObjects(csvfile):
       # smtp:user01@test.com;smtp:user@test.com;X400:c=us\;a= \;p=Test\;o=Exchange\;s=User\;
       proxyAddresses = row['proxyAddresses'].split(";")  #
       for proxyAddress in proxyAddresses:
-        if "smtp:" in proxyAddress:
+        if ado.objectClass != "contact" and "smtp:" in proxyAddress:
           p = proxyAddress.replace('smtp:','').split("@")
           print("if "+p[0]+" doesnotequal "+ado.mail.split("@")[0])
           if p[0] != ado.mail.split("@")[0] and p[0] not in ado.proxyAddresses: #if alternate email addresses do not match the username, add as a proxy
@@ -184,6 +184,4 @@ if __name__ == "__main__":
     pass
   finally:
     pass
-
-
 
