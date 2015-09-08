@@ -18,7 +18,6 @@ argparser.add_argument('--outfile','-o',default="aliases",type=str,help='outfile
 args = argparser.parse_args()
 
 
-
 #Main Functions
 def BuildADObjects(csvfile):
   #pull mail, mailNickname, members, memberOf into a Group Object
@@ -35,10 +34,18 @@ def BuildADObjects(csvfile):
       members = ReturnCNfromMemberList(row['member']) #Returns a list of members if the record is a group
       for member in members:
         ado.add_member(member)
-      #proxyAddresses = row['proxyAddresses'].split(";")
-      #for proxyAddress in proxyAddresses:
-      #  if "smtp:" in proxyAddress:
-      #    ado.add_proxyAddress(proxyAddress.strip('smtp:'))
+      # ProxyAddresses
+      # smtp:user01@test.com;smtp:user@test.com;X400:c=us\;a= \;p=Test\;o=Exchange\;s=User\;
+      proxyAddresses = row['proxyAddresses'].split(";")  #
+      for proxyAddress in proxyAddresses:
+        if "smtp:" in proxyAddress:
+          p = proxyAddress.replace('smtp:','').split("@")
+          print("if "+p[0]+" doesnotequal "+ado.mail.split("@")[0])
+          if p[0] != ado.mail.split("@")[0] and p[0] not in ado.proxyAddresses: #if alternate email addresses do not match the username, add as a proxy
+            print("add "+ p[0])
+            ado.add_proxyAddress(p[0])
+          else:
+            print("notaddinganything")
       if ado.objectClass == "user" or ado.objectClass == "contact" or ado.objectClass == "group":
         ActDirObj[ado.name]=ado
   ActDirObj = SetAltRecipientMail(ActDirObj)
@@ -73,20 +80,19 @@ def BuildAliases(ActDirObj):
       ualiases.append("\n# "+adobj.objectClass+"'"+adobj.name+"' \n")
       alias = adobj.mail.split("@")[0] #strip the domain
       ualiases.append(alias+":"+adobj.altRecipientMail+"\n")
-    #elif len(adobj.proxyAddresses) > 1:
-    #  for e in adobj.proxyAddresses:
-    #    if e.split("@")[0] == adobj.mail.split("@")[0]:
-    #      aliases.append(e+":"+adobj.mail+"\n")
+    elif len(adobj.proxyAddresses) > 0 and adobj.proxyAddresses != None:
+      for e in adobj.proxyAddresses:
+        ualiases.append("\n"+e+":"+adobj.mail.split("@")[0]+"\n")
     else:
       if type(adobj.name) is str and adobj.name != "":
         badaliases.append("\n# "+adobj.objectClass+"'"+adobj.name+"' No Mail data found \t\t\t"+','.join(map(str,adobj.members)).strip("None"))
-  aliases.append("#Groups")
+  aliases.append("#Groups "+str(len(galiases)))
   for ga in galiases:
     aliases.append(ga)
-  aliases.append("#Users")
+  aliases.append("#Users "+str(len(ualiases)))
   for ua in ualiases:
     aliases.append(ua)
-  aliases.append("#Bad Aliases")
+  aliases.append("#Bad Aliases "+str(len(badaliases)))
   for ba in badaliases:
     aliases.append(ba)
   return aliases
@@ -178,3 +184,6 @@ if __name__ == "__main__":
     pass
   finally:
     pass
+
+
+
