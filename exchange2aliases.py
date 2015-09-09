@@ -23,29 +23,28 @@ def BuildADObjects(csvfile):
   #pull mail, mailNickname, members, memberOf into a Group Object
   ActDirObj = {}
   with open(csvfile) as csvf:
+    # Reads from the file specified with --csvfile 
     reader = csv.DictReader(csvf)
     for row in reader:
       ado = adobject()
+      # name contains the CN name, the name that is referenced by member and altRecipient.
       ado.name = row['cn']
+      # object class contains the class: User, Group, or Contact
       ado.objectClass = row['objectClass']
+      # mailNickname contains something... not sure why this was included....
       ado.mailNickname = row['mailNickname']
-      ado.mail = row['mail']
+      # mail contains the email address mail is being sent to on this server (i.e. the alias that would be created)
+      ado.mail = row['mail'].lower()
+      # altRecipient contains a contact or another user that this emial account is forwarded to.
       ado.altRecipient = ReturnCN(row['altRecipient'])
+      # member contains a list of members for a group
       members = ReturnCNfromMemberList(row['member']) #Returns a list of members if the record is a group
       for member in members:
         ado.add_member(member)
-      # ProxyAddresses
+      # ProxyAddresses are alternate addresses for a user or group.
       # smtp:user01@test.com;smtp:user@test.com;X400:c=us\;a= \;p=Test\;o=Exchange\;s=User\;
       proxyAddresses = row['proxyAddresses'].split(";")  #
-      for proxyAddress in proxyAddresses:
-        if ado.objectClass != "contact" and "smtp:" in proxyAddress:
-          p = proxyAddress.replace('smtp:','').split("@")
-          print("if "+p[0]+" doesnotequal "+ado.mail.split("@")[0])
-          if p[0] != ado.mail.split("@")[0] and p[0] not in ado.proxyAddresses: #if alternate email addresses do not match the username, add as a proxy
-            print("add "+ p[0])
-            ado.add_proxyAddress(p[0])
-          else:
-            print("notaddinganything")
+      SetproxyAddresses(ado,proxyAddresses)
       if ado.objectClass == "user" or ado.objectClass == "contact" or ado.objectClass == "group":
         ActDirObj[ado.name]=ado
   ActDirObj = SetAltRecipientMail(ActDirObj)
@@ -64,6 +63,7 @@ def BuildAliases(ActDirObj):
   ualiases = []
   badaliases = []
   for adobj in list(ActDirObj.values()):
+    BadAlias = False
     if len(adobj.members) > 0 and adobj.members[0] != None and adobj.objectClass == "group":  #Indicates a group when the members are greater than 1
       alias = adobj.mail.split("@")[0] #strip the domain
       emailaddresses = ReturnMemberEmailAddresses(ActDirObj,adobj.members) #return the email addresses for the members in the group
@@ -74,30 +74,46 @@ def BuildAliases(ActDirObj):
             addrs=e
           else:
             addrs+=","+e
-      galiases.append("\n# "+adobj.objectClass+"'"+adobj.name+"' \n")
+      galiases.append("\n\n# "+adobj.objectClass+" '"+adobj.name+"' \n")
       galiases.append(alias+":"+addrs+"\n")
-    elif type(adobj.altRecipientMail) is str and adobj.altRecipientMail != "":#indicates an account with an alternate email address
-      ualiases.append("\n# "+adobj.objectClass+"'"+adobj.name+"' \n")
+      BadAlias = False
+    else:
+      BadAlias = True
+    if type(adobj.altRecipientMail) is str and adobj.altRecipientMail != "":#indicates an account with an alternate email address
+      ualiases.append("\n\n# "+adobj.objectClass+" '"+adobj.name+"' \n")
       alias = adobj.mail.split("@")[0] #strip the domain
       ualiases.append(alias+":"+adobj.altRecipientMail+"\n")
-    elif len(adobj.proxyAddresses) > 0 and adobj.proxyAddresses != None:
-      for e in adobj.proxyAddresses:
-        ualiases.append("\n"+e+":"+adobj.mail.split("@")[0]+"\n")
+      BadAlias = False
     else:
+      BadAlias = True
+    if len(adobj.proxyAddresses) > 0 and adobj.proxyAddresses != None:
+      for e in adobj.proxyAddresses:
+        print("pAlias "+e)
+        if adobj.objectClass == "group":
+          galiases.append(e+":"+adobj.mail.split("@")[0]+"\n")
+        if adobj.objectClass == "user":
+          ualiases.append(e+":"+adobj.mail.split("@")[0]+"\n")
+      BadAlias = False
+    else:
+      BadAlias = True
+    if BadAlias:
       if type(adobj.name) is str and adobj.name != "":
         badaliases.append("\n# "+adobj.objectClass+"'"+adobj.name+"' No Mail data found \t\t\t"+','.join(map(str,adobj.members)).strip("None"))
-  aliases.append("#Groups "+str(len(galiases)))
+  #aliases.append("#Groups "+str(len(galiases)))
+  aliases.append("#Groups ")
   for ga in galiases:
     aliases.append(ga)
-  aliases.append("#Users "+str(len(ualiases)))
+  #aliases.append("\n\n\n#Users "+str(len(ualiases)))
+  aliases.append("\n\n\n#Users ")
   for ua in ualiases:
     aliases.append(ua)
-  aliases.append("#Bad Aliases "+str(len(badaliases)))
+  aliases.append("\n\n\n#Bad Aliases "+str(len(badaliases)))
   for ba in badaliases:
     aliases.append(ba)
   return aliases
 
 def WriteOutaliasesfile(outfile,aliases):
+  # writes out the file specified with --outfile
   f = open(outfile,'w')
   f.write(aliases)
   f.close()
@@ -106,6 +122,16 @@ def WriteOutaliasesfile(outfile,aliases):
 
 
 #supporting functions
+
+def SetproxyAddresses(ado,proxyAddresses):
+  for proxyAddress in proxyAddresses:
+    if ado.objectClass != "contact" and "smtp:" in proxyAddress:
+      p = proxyAddress.replace('smtp:','').split("@")
+      #print("if "+p[0]+" doesnotequal "+ado.mail.split("@")[0])
+      if p[0].lower() != ado.mail.split("@")[0].lower() and p[0] not in ado.proxyAddresses: #if alternate email addresses do not match the username, add as a proxy
+        #print("Adding "+ p[0])
+        ado.add_proxyAddress(p[0].lower())
+  #return ado
 
 def RemoveAnyWithoutEmail(ActDirObj):
   cleanActDirObj = {}
@@ -184,4 +210,3 @@ if __name__ == "__main__":
     pass
   finally:
     pass
-
